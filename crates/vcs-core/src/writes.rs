@@ -16,6 +16,14 @@ pub enum WriteAction {
     Revert,
     Cleanup,
     Resolve,
+    Stage,
+    Unstage,
+    Branch,
+    Switch,
+    Fetch,
+    Pull,
+    Push,
+    Discard,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +58,12 @@ impl Client {
         mut request: WriteRequest,
     ) -> Result<PreparedWrite> {
         runner::validate(workspace)?;
+        if workspace.vcs != crate::VcsKind::Svn {
+            return Err(Error::new(
+                "wrongVcs",
+                "SVN操作はSVN作業コピーでのみ実行できます",
+            ));
+        }
         if request.message.len() > 65536
             || request.message.contains('\0')
             || (request.action == WriteAction::Commit && request.message.trim().is_empty())
@@ -204,6 +218,7 @@ impl Client {
                         && change.properties != "conflicted"
                 }
                 WriteAction::Update | WriteAction::Cleanup => true,
+                _ => unreachable!("Git操作は上で拒否済み"),
             };
             if !permitted {
                 return Err(Error::new(
@@ -360,6 +375,7 @@ impl Client {
             WriteAction::Resolve => vec!["外部エディタでテキスト競合を解決済みであることを確認してください。現在の内容を解決結果として採用します。".into()],
             WriteAction::Add => vec!["選択対象だけを追加予定にします。ディレクトリの配下は自動追加しません。".into()],
             WriteAction::Cleanup => vec!["通常のcleanupのみ実行します。未追跡・無視ファイルの削除や強制解除は行いません。".into()],
+            _ => unreachable!("Git操作は上で拒否済み"),
         };
         Ok(PreparedWrite {
             workspace: workspace.clone(),
@@ -405,6 +421,7 @@ impl Client {
             WriteAction::Resolve => {
                 strings(&["resolve", "--accept", "working", "--depth", "empty"])
             }
+            _ => unreachable!("Git操作は上で拒否済み"),
         };
         let mut message_file = None;
         let input = if prepared.request.action == WriteAction::Commit {
@@ -507,6 +524,7 @@ impl Client {
                 }),
                 WriteAction::Cleanup => !after.iter().any(|c| c.locked),
                 WriteAction::Update => true,
+                _ => unreachable!("Git操作は上で拒否済み"),
             };
             if !expected {
                 return Err(Error::new("outcomeUnknown", format!("CLIは終了しましたが、対象の処理完了を確認できません: {path}。状態・履歴を確認してください")));

@@ -204,6 +204,68 @@ impl Operations {
         })?;
         Ok(result)
     }
+
+    pub async fn execute_git(
+        &mut self,
+        workspace: &Workspace,
+        client: &vcs_core::git::Client,
+        action: WriteAction,
+        paths: Vec<String>,
+        message: String,
+    ) -> Result<String> {
+        self.journal.ensure_available(workspace)?;
+        let action_name = match action {
+            WriteAction::Stage => "stage",
+            WriteAction::Unstage => "unstage",
+            WriteAction::Branch => "branch",
+            WriteAction::Switch => "switch",
+            WriteAction::Fetch => "fetch",
+            WriteAction::Pull => "pull",
+            WriteAction::Push => "push",
+            WriteAction::Discard => "discard",
+            WriteAction::Commit => "commit",
+            _ => return Err(Error::new("invalidAction", "Git操作が不正です")),
+        };
+        client
+            .preflight(workspace, action_name, &paths, &message)
+            .await?;
+        let id = format!(
+            "git-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| Error::new("clock", "現在時刻を取得できません"))?
+                .as_nanos()
+        );
+        self.journal.begin(PendingOperation {
+            id: id.clone(),
+            workspace: workspace.clone(),
+            action,
+            paths: paths.clone(),
+            key: key(workspace)?,
+            started_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| Error::new("clock", "現在時刻を取得できません"))?
+                .as_secs(),
+        })?;
+        match client.write(workspace, action_name, &paths, &message).await {
+            Ok(output) => {
+                self.journal.acknowledge(&id, true).map_err(|_| {
+                    Error::new(
+                        "outcomeUnknown",
+                        "Git操作は成功しましたが操作記録を更新できません。成否を確認してください",
+                    )
+                })?;
+                Ok(output)
+            }
+            Err(error) => Err(Error::new(
+                "outcomeUnknown",
+                format!(
+                    "操作の成否を確認してください。自動再実行はしません。{}",
+                    error.message
+                ),
+            )),
+        }
+    }
 }
 
 fn key(workspace: &Workspace) -> Result<String> {
@@ -239,6 +301,7 @@ mod tests {
             name: "テスト".into(),
             target: Target::Local,
             path: path.into(),
+            vcs: vcs_core::VcsKind::Svn,
         }
     }
     fn pending(workspace: Workspace) -> PendingOperation {

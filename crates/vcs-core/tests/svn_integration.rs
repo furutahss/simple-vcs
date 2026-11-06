@@ -579,6 +579,7 @@ impl Fixture {
                 name: "統合テスト".into(),
                 target: Target::Local,
                 path: work.to_str().unwrap().into(),
+                vcs: vcs_core::VcsKind::Svn,
             },
             _temp: temp,
         }

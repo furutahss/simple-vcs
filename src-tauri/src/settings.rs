@@ -5,12 +5,18 @@ use std::{
 };
 use vcs_core::{Error, Result, Workspace};
 
+fn default_git() -> String {
+    "git".into()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     pub version: u32,
     pub workspaces: Vec<Workspace>,
     pub svn: String,
+    #[serde(default = "default_git")]
+    pub git: String,
     pub ssh: String,
 }
 impl Default for Settings {
@@ -19,6 +25,7 @@ impl Default for Settings {
             version: 1,
             workspaces: Vec::new(),
             svn: "svn".into(),
+            git: "git".into(),
             ssh: "ssh".into(),
         }
     }
@@ -73,7 +80,7 @@ fn validate(settings: &Settings) -> Result<()> {
             "未対応の設定バージョンです。自動上書きは行いません",
         ));
     }
-    for tool in [&settings.svn, &settings.ssh] {
+    for tool in [&settings.svn, &settings.git, &settings.ssh] {
         if tool.trim().is_empty()
             || tool.len() > 32768
             || tool.contains(['\0', '\r', '\n'])
@@ -115,6 +122,7 @@ mod tests {
             name: "開発".into(),
             target: Target::Local,
             path: temp.path().to_str().unwrap().into(),
+            vcs: vcs_core::VcsKind::Svn,
         });
         store.save(&settings).unwrap();
         settings.svn = "svn-custom".into();
@@ -182,6 +190,7 @@ mod tests {
                 host: "-bad".into(),
             },
             path: "/srv/work".into(),
+            vcs: vcs_core::VcsKind::Svn,
         };
         let mut settings = Settings {
             workspaces: vec![workspace],

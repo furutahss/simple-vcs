@@ -1,3 +1,4 @@
+pub mod git;
 pub mod runner;
 pub mod svn;
 pub mod writes;
@@ -11,6 +12,14 @@ pub enum Target {
     Ssh { host: String },
 }
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum VcsKind {
+    #[default]
+    Svn,
+    Git,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Workspace {
@@ -18,6 +27,8 @@ pub struct Workspace {
     pub name: String,
     pub target: Target,
     pub path: String,
+    #[serde(default)]
+    pub vcs: VcsKind,
 }
 
 #[derive(Debug, Clone, Serialize)]

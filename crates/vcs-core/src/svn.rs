@@ -252,6 +252,9 @@ impl Client {
         path: Option<&str>,
         limit: usize,
     ) -> Result<String> {
+        if workspace.vcs != crate::VcsKind::Svn {
+            return Err(Error::new("wrongVcs", "SVN作業コピーを選択してください"));
+        }
         runner::execute(
             runner::command(workspace, &self.svn, &self.ssh, &args, path)?,
             60,

@@ -4,12 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { WritePanel, RecoveryPanel } from "./WritePanel";
 import type { Api, PendingOperation, Workspace, WriteRequest } from "./types";
 
-const workspace: Workspace = { id: "one", name: "作業", target: { kind: "ssh", host: "linux" }, path: "/srv/work" };
+const workspace: Workspace = { id: "one", name: "作業", target: { kind: "ssh", host: "linux" }, path: "/srv/work", vcs: "svn" };
 const pending: PendingOperation = { id: "unknown", workspace, action: "commit", paths: ["one.txt"], startedAt: 1 };
 function client(): Api {
   return {
     load: vi.fn(), save: vi.fn(), remove: vi.fn(), configure: vi.fn(), inspect: vi.fn(), status: vi.fn(), diff: vi.fn(), history: vi.fn(), chooseDirectory: vi.fn(),
-    pendingOperations: vi.fn().mockResolvedValue([]), inspectPending: vi.fn().mockResolvedValue({ operation: pending, changes: [], history: [] }), acknowledgePending: vi.fn().mockResolvedValue(undefined),
+    gitInfo: vi.fn(), gitStatus: vi.fn(), gitDiff: vi.fn(), gitHistory: vi.fn(), gitBranches: vi.fn(), gitCommitDiff: vi.fn(), gitWrite: vi.fn(),
+    pendingOperations: vi.fn().mockResolvedValue([]), inspectPending: vi.fn().mockResolvedValue({ operation: pending, changes: [], history: [], gitHistory: [] }), acknowledgePending: vi.fn().mockResolvedValue(undefined),
     previewWrite: vi.fn().mockImplementation((_id: string, request: WriteRequest) => Promise.resolve({ token: "preview", workspace, action: request.action, paths: request.paths, warnings: ["選択対象を確認してください"] })),
     executeWrite: vi.fn().mockResolvedValue({ output: "Committed revision 2.", revision: 2 }),
   };

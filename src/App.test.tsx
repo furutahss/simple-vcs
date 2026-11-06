@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { Api, Settings, Workspace } from "./types";
 
-const local: Workspace = { id: "local", name: "ローカル開発", target: { kind: "local" }, path: "/tmp/work" };
-const remote: Workspace = { id: "remote", name: "Linux開発", target: { kind: "ssh", host: "team" }, path: "/srv/work" };
-const config: Settings = { version: 1, workspaces: [local, remote], svn: "svn", ssh: "ssh" };
+const local: Workspace = { id: "local", name: "ローカル開発", target: { kind: "local" }, path: "/tmp/work", vcs: "svn" };
+const remote: Workspace = { id: "remote", name: "Linux開発", target: { kind: "ssh", host: "team" }, path: "/srv/work", vcs: "svn" };
+const config: Settings = { version: 1, workspaces: [local, remote], svn: "svn", git: "git", ssh: "ssh" };
 function api(): Api {
   return {
     load: vi.fn().mockResolvedValue(config), save: vi.fn().mockResolvedValue(config),
@@ -16,6 +16,7 @@ function api(): Api {
     diff: vi.fn().mockResolvedValue("--- before\n+++ after\n-old\n+new"),
     history: vi.fn().mockResolvedValue([{ revision: 2, author: "alice", date: "2026-11-06T01:00:00Z", message: "変更内容", paths: [{ action: "M", path: "/trunk/a" }] }]),
     chooseDirectory: vi.fn().mockResolvedValue("/tmp/selected"),
+    gitInfo: vi.fn(), gitStatus: vi.fn(), gitDiff: vi.fn(), gitHistory: vi.fn(), gitBranches: vi.fn(), gitCommitDiff: vi.fn(), gitWrite: vi.fn(),
     previewWrite: vi.fn(), executeWrite: vi.fn(), pendingOperations: vi.fn().mockResolvedValue([]), inspectPending: vi.fn(), acknowledgePending: vi.fn(),
   };
 }

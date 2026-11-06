@@ -81,3 +81,23 @@ input[type="checkbox"] { width: 15px; height: 15px; flex-shrink: 0; margin: 0; a
 .selectable-change { display: flex; align-items: center; padding-left: 12px; border-bottom: 1px solid #f0f3f7; }
 .selectable-change .change-row { border-bottom: 0; flex: 1; min-width: 0; }
 .select-all { padding: 12px; margin: 0; border-bottom: 1px solid #e7ecf3; color: #6c7f98; }
+.git-view { padding: 22px 28px; display: grid; gap: 14px; }
+.git-heading { display: flex; justify-content: space-between; align-items: center; }
+.git-heading h1 { margin: 5px 0; }
+.git-toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid #dce4ef; border-radius: 8px; background: white; }
+.git-toolbar select { min-width: 180px; }
+.git-files { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(280px, 1.5fr); gap: 12px; min-height: 360px; }
+.git-files > div, .git-history > div { border: 1px solid #dce4ef; border-radius: 8px; background: white; padding: 12px; min-width: 0; }
+.git-files h2 { font-size: 14px; margin: 0 0 10px; }
+.git-diff pre { white-space: pre-wrap; overflow: auto; max-height: 65vh; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.git-history { display: grid; grid-template-columns: minmax(380px, 1fr) minmax(280px, 1fr); gap: 12px; }
+.git-history > div { display: grid; }
+.git-history button { display: grid; grid-template-columns: 20px 90px minmax(100px, 1fr) auto; text-align: left; align-items: center; gap: 4px 10px; padding: 10px; border: 0; border-bottom: 1px solid #edf1f6; background: transparent; cursor: pointer; }
+.git-history button small { grid-column: 2 / 4; color: #8897aa; }
+.git-history button code, .git-history button span { color: #718198; font-size: 12px; }
+.commit-graph { display: grid; justify-items: center; color: #285fbe !important; }
+.commit-graph i { font-style: normal; line-height: 8px; }
+.branch-list { display: flex; gap: 8px; flex-wrap: wrap; color: #718198; font-size: 12px; }
+.branch-list span { border: 1px solid #dce4ef; border-radius: 20px; padding: 4px 9px; }
+@media (max-width: 1050px) { .git-files { grid-template-columns: 1fr 1fr; } .git-diff { grid-column: 1 / -1; } }
+@media (max-width: 680px) { .git-files, .git-history { grid-template-columns: 1fr; } .git-diff { grid-column: auto; } }

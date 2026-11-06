@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { Api, PendingOperation, RecoveryInfo, Workspace, WriteAction, WritePreview, WriteResult } from "./types";
 
-const actions: Record<WriteAction, string> = {
+const actions: Record<WriteAction | import("./types").GitWriteAction, string> = {
   add: "追加予定にする", delete: "削除予定にする", commit: "コミット", update: "更新",
   revert: "変更を破棄", cleanup: "cleanup", resolve: "解決済みにする",
+  stage: "Stage", unstage: "Unstage", discard: "未ステージ変更を破棄", branch: "ブランチ作成", switch: "ブランチ切替", fetch: "Fetch", pull: "Pull", push: "Push",
 };
 function message(error: unknown): string { return error && typeof error === "object" && "message" in error ? String(error.message) : String(error); }
 function outcomeUnknown(error: unknown): boolean { return !!error && typeof error === "object" && "kind" in error && error.kind === "outcomeUnknown"; }
@@ -96,6 +97,7 @@ export function RecoveryPanel({ operations, client, onChanged, onBusyChange }: {
       <ul className="write-targets">{operation.paths.map(path => <li key={path}><code>{path}</code></li>)}</ul>
       <button disabled={busy} onClick={() => void inspect(operation.id)}>状態・最新履歴を確認</button>
       {report?.operation.id === operation.id && <div className="recovery-report"><p>現在の変更: {report.changes.length}件</p><ul>{report.changes.map(change => <li key={change.path}>{change.status} · {change.path}</li>)}</ul><h3>リポジトリの最新履歴</h3><ul>{report.history.map(revision => <li key={revision.revision}>r{revision.revision} · {revision.author} · {revision.message}</li>)}</ul></div>}
+      {report?.operation.id === operation.id && report.gitHistory.length > 0 && <div className="recovery-report"><h3>最新のGit履歴</h3><ul>{report.gitHistory.map(commit => <li key={commit.hash}>{commit.hash.slice(0, 12)} · {commit.author} · {commit.message}</li>)}</ul></div>}
       <label className="checkbox-label"><input type="checkbox" disabled={busy} checked={checked.includes(operation.id)} onChange={event => setChecked(previous => event.target.checked ? [...previous, operation.id] : previous.filter(id => id !== operation.id))} />外部で処理の停止と成否を確認しました</label>
       <button disabled={busy || !checked.includes(operation.id)} onClick={() => void acknowledge(operation.id)}>書込み制限を解除</button>
     </article>)}{error && <p className="error" role="alert">{error}</p>}

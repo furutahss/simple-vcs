@@ -13,6 +13,10 @@ use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use vcs_core::writes::{WriteRequest, WriteResult};
 use vcs_core::{
+    git::{
+        Branch as GitBranch, Change as GitChange, Client as GitClient, Commit as GitCommit,
+        Info as GitInfo,
+    },
     svn::{Change, Client, Info, Revision},
     Error, Result, Workspace,
 };
@@ -90,7 +94,12 @@ fn remove_workspace(state: State<'_, AppState>, id: String) -> Result<Settings> 
 }
 
 #[tauri::command]
-fn configure_tools(state: State<'_, AppState>, svn: String, ssh: String) -> Result<Settings> {
+fn configure_tools(
+    state: State<'_, AppState>,
+    svn: String,
+    git: String,
+    ssh: String,
+) -> Result<Settings> {
     let mut operations = state
         .operations
         .try_lock()
@@ -99,6 +108,7 @@ fn configure_tools(state: State<'_, AppState>, svn: String, ssh: String) -> Resu
     let store = store(&state)?;
     let mut settings = store.load()?;
     settings.svn = svn;
+    settings.git = git;
     settings.ssh = ssh;
     store.save(&settings)?;
     Ok(settings)
@@ -118,6 +128,97 @@ fn saved_client(state: &AppState, id: &str) -> Result<(Workspace, Client)> {
             ssh: settings.ssh,
         },
     ))
+}
+
+fn saved_git_client(state: &AppState, id: &str) -> Result<(Workspace, GitClient)> {
+    let settings = store(state)?.load()?;
+    let workspace = settings
+        .workspaces
+        .into_iter()
+        .find(|w| w.id == id)
+        .ok_or_else(|| Error::new("workspaceMissing", "登録された作業コピーが見つかりません"))?;
+    Ok((
+        workspace,
+        GitClient {
+            git: settings.git,
+            ssh: settings.ssh,
+        },
+    ))
+}
+
+#[tauri::command]
+async fn get_git_info(state: State<'_, AppState>, id: String) -> Result<GitInfo> {
+    let _guard = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    client.inspect(&workspace).await
+}
+
+#[tauri::command]
+async fn get_git_status(state: State<'_, AppState>, id: String) -> Result<Vec<GitChange>> {
+    let _guard = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    client.status(&workspace).await
+}
+
+#[tauri::command]
+async fn get_git_diff(
+    state: State<'_, AppState>,
+    id: String,
+    path: String,
+    staged: bool,
+) -> Result<String> {
+    let _guard = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    client.diff(&workspace, &path, staged).await
+}
+
+#[tauri::command]
+async fn get_git_history(
+    state: State<'_, AppState>,
+    id: String,
+    skip: u32,
+) -> Result<Vec<GitCommit>> {
+    let _guard = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    client.history(&workspace, skip).await
+}
+
+#[tauri::command]
+async fn get_git_commit_diff(
+    state: State<'_, AppState>,
+    id: String,
+    hash: String,
+) -> Result<String> {
+    let _guard = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    client.commit_diff(&workspace, &hash).await
+}
+
+#[tauri::command]
+async fn get_git_branches(state: State<'_, AppState>, id: String) -> Result<Vec<GitBranch>> {
+    let _guard = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    client.branches(&workspace).await
+}
+
+#[tauri::command]
+async fn git_write(
+    state: State<'_, AppState>,
+    id: String,
+    action: vcs_core::writes::WriteAction,
+    paths: Vec<String>,
+    message: String,
+) -> Result<String> {
+    let mut operations = state.operations.lock().await;
+    let (workspace, client) = saved_git_client(&state, &id)?;
+    if workspace.vcs != vcs_core::VcsKind::Git {
+        return Err(Error::new("wrongVcs", "Git作業コピーを選択してください"));
+    }
+    state.writing.store(true, Ordering::SeqCst);
+    let _active_write = ActiveWrite(&state.writing);
+    operations
+        .execute_git(&workspace, &client, action, paths, message)
+        .await
 }
 
 #[tauri::command]
@@ -198,6 +299,7 @@ struct RecoveryInfo {
     operation: PendingOperation,
     changes: Vec<Change>,
     history: Vec<Revision>,
+    git_history: Vec<GitCommit>,
 }
 
 #[tauri::command]
@@ -213,16 +315,60 @@ async fn inspect_pending_operation(
         .find(|p| p.id == operation_id)
         .ok_or_else(|| Error::new("operationMissing", "未完了操作が見つかりません"))?;
     let settings = store(&state)?.load()?;
-    let client = Client {
-        svn: settings.svn,
-        ssh: settings.ssh,
+    let (changes, history, git_history) = if operation.workspace.vcs == vcs_core::VcsKind::Git {
+        let client = GitClient {
+            git: settings.git,
+            ssh: settings.ssh,
+        };
+        let changes = client
+            .status(&operation.workspace)
+            .await?
+            .into_iter()
+            .map(|change| Change {
+                path: change.path,
+                status: if change.conflicted {
+                    "conflicted"
+                } else if change.untracked {
+                    "unversioned"
+                } else if change.worktree != "." {
+                    "modified"
+                } else {
+                    "normal"
+                }
+                .into(),
+                properties: "none".into(),
+                tree_conflicted: change.conflicted,
+                locked: false,
+                copied: false,
+                switched: false,
+            })
+            .collect();
+        (
+            changes,
+            Vec::new(),
+            client
+                .history(&operation.workspace, 0)
+                .await?
+                .into_iter()
+                .take(10)
+                .collect(),
+        )
+    } else {
+        let client = Client {
+            svn: settings.svn,
+            ssh: settings.ssh,
+        };
+        (
+            client.status(&operation.workspace).await?,
+            client.latest_history(&operation.workspace).await?,
+            Vec::new(),
+        )
     };
-    let changes = client.status(&operation.workspace).await?;
-    let history = client.latest_history(&operation.workspace).await?;
     Ok(RecoveryInfo {
         operation,
         changes,
         history,
+        git_history,
     })
 }
 
@@ -293,7 +439,7 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.state::<AppState>().writing.load(Ordering::SeqCst) {
                     api.prevent_close();
-                    window.app_handle().dialog().message("SVN操作の結果を確認しています。処理が終了するまでお待ちください。強制終了した場合は、次回起動時に操作の成否を確認してください。").title("SVN操作中").show(|_| {});
+                    window.app_handle().dialog().message("VCS操作の結果を確認しています。処理が終了するまでお待ちください。強制終了した場合は、次回起動時に作業コピーの状態と履歴を確認してください。").title("VCS操作中").show(|_| {});
                 }
             }
         })
@@ -306,6 +452,13 @@ pub fn run() {
             get_status,
             get_diff,
             get_history,
+            get_git_info,
+            get_git_status,
+            get_git_diff,
+            get_git_history,
+            get_git_commit_diff,
+            get_git_branches,
+            git_write,
             preview_write,
             execute_write,
             get_pending_operations,
@@ -319,7 +472,7 @@ pub fn run() {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if app.state::<AppState>().writing.load(Ordering::SeqCst) {
                     api.prevent_exit();
-                    app.dialog().message("SVN操作中は終了できません。結果が返るまでお待ちください。強制終了時は次回起動時に成否確認が必要です。").title("SVN操作中").show(|_| {});
+                    app.dialog().message("VCS操作中は終了できません。結果が返るまでお待ちください。強制終了時は次回起動時に成否確認が必要です。").title("VCS操作中").show(|_| {});
                 }
             }
         });

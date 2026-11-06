@@ -73,10 +73,24 @@ pub fn remote_command(
     args: &[String],
     path: Option<&str>,
 ) -> Result<String> {
-    remote_command_paths(workspace, args, &path.into_iter().collect::<Vec<_>>())
+    remote_command_paths(
+        workspace,
+        if workspace.vcs == crate::VcsKind::Git {
+            "git"
+        } else {
+            "svn"
+        },
+        args,
+        &path.into_iter().collect::<Vec<_>>(),
+    )
 }
 
-fn remote_command_paths(workspace: &Workspace, args: &[String], paths: &[&str]) -> Result<String> {
+fn remote_command_paths(
+    workspace: &Workspace,
+    tool: &str,
+    args: &[String],
+    paths: &[&str],
+) -> Result<String> {
     validate(workspace)?;
     let mut guard = String::new();
     for path in paths {
@@ -84,8 +98,9 @@ fn remote_command_paths(workspace: &Workspace, args: &[String], paths: &[&str]) 
         guard.push_str(&format!("root=$(pwd -P) && target=$(realpath -m -- {}) && case \"$target\" in \"$root\"|\"$root\"/*) ;; *) exit 76;; esac && ", quote(path)));
     }
     Ok(format!(
-        "cd {} && {guard}LANGUAGE=C LC_ALL=C.UTF-8 svn {}",
+        "cd {} && {guard}LANGUAGE=C LC_ALL=C.UTF-8 {} {}",
         quote(&workspace.path),
+        quote(tool),
         args.iter().map(|a| quote(a)).collect::<Vec<_>>().join(" ")
     ))
 }
@@ -97,13 +112,23 @@ pub fn command(
     args: &[String],
     path: Option<&str>,
 ) -> Result<Command> {
-    command_for_paths(
+    command_with_tool(
         workspace,
         svn,
         ssh,
         args,
         &path.into_iter().collect::<Vec<_>>(),
     )
+}
+
+pub fn command_with_tool(
+    workspace: &Workspace,
+    tool: &str,
+    ssh: &str,
+    args: &[String],
+    paths: &[&str],
+) -> Result<Command> {
+    command_for_paths(workspace, tool, ssh, args, paths)
 }
 
 #[cfg(target_os = "macos")]
@@ -118,7 +143,7 @@ fn macos_svn_path(path: &std::ffi::OsStr) -> Result<std::ffi::OsString> {
 
 pub fn command_for_paths(
     workspace: &Workspace,
-    svn: &str,
+    tool: &str,
     ssh: &str,
     args: &[String],
     paths: &[&str],
@@ -145,9 +170,9 @@ pub fn command_for_paths(
                     ));
                 }
             }
-            let mut command = Command::new(svn);
+            let mut command = Command::new(tool);
             #[cfg(target_os = "macos")]
-            if svn == "svn" {
+            if tool == "svn" {
                 let path = std::env::var_os("PATH")
                     .unwrap_or_else(|| "/usr/bin:/bin:/usr/sbin:/sbin".into());
                 command.env("PATH", macos_svn_path(&path)?);
@@ -171,7 +196,16 @@ pub fn command_for_paths(
                 "ConnectTimeout=15",
                 "--",
                 host,
-                &remote_command_paths(workspace, args, paths)?,
+                &remote_command_paths(
+                    workspace,
+                    if workspace.vcs == crate::VcsKind::Git {
+                        "git"
+                    } else {
+                        "svn"
+                    },
+                    args,
+                    paths,
+                )?,
             ]);
             command
         }
@@ -299,6 +333,8 @@ pub async fn execute_bytes(
             "pathOutsideRoot"
         } else if status.code() == Some(255) {
             "ssh"
+        } else if program == "git" || program.ends_with("/git") {
+            "git"
         } else {
             "svn"
         };
@@ -328,6 +364,7 @@ mod tests {
             name: "テスト".into(),
             target: Target::Ssh { host: host.into() },
             path: "/srv/project ' 日本語".into(),
+            vcs: crate::VcsKind::Svn,
         }
     }
 
@@ -434,6 +471,7 @@ mod tests {
             name: "テスト".into(),
             target: Target::Local,
             path: temp.path().to_str().unwrap().into(),
+            vcs: crate::VcsKind::Svn,
         };
         let args = vec!["--version".into(), "--quiet".into()];
         let command = command(&workspace, "svn", "ssh", &args, None).unwrap();
