@@ -1,0 +1,11 @@
+[package]
+name = "vcs-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+tokio.workspace = true
+quick-xml = { version = "0.41", features = ["serialize"] }
+tempfile = "3"
