@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
@@ -145,12 +147,12 @@ jobs:
           touch portable/PORTABLE
           if [[ "${{ runner.os }}" == Windows ]]; then
             npm run tauri -- build --ci --no-bundle --target "${{ matrix.target }}" -- --locked
-            cp target/release/simple-vcs.exe portable/SimpleVCS.exe
+            cp "target/${{ matrix.target }}/release/simple-vcs.exe" portable/SimpleVCS.exe
             powershell -NoProfile -Command 'Compress-Archive -Path portable\* -DestinationPath Simple-VCS-Windows-x64-portable.zip'
           elif [[ "${{ runner.os }}" == macOS ]]; then
             npm run tauri -- build --ci --bundles app --target "${{ matrix.target }}" -- --locked
             mkdir portable-mac
-            mv "target/release/bundle/macos/Simple VCS.app" portable-mac/
+            mv "target/${{ matrix.target }}/release/bundle/macos/Simple VCS.app" portable-mac/
             touch portable-mac/PORTABLE
             ditto -c -k --sequesterRsrc --keepParent portable-mac "Simple-VCS-${{ matrix.target }}-portable.zip"
           fi
@@ -167,8 +169,8 @@ jobs:
       - name: Build Linux portable ZIP
         if: runner.os == 'Linux'
         run: |
-          mkdir portable
-          cp target/release/bundle/appimage/*.AppImage portable/Simple-VCS-Linux-x64.AppImage
+          mkdir -p portable
+          cp target/${{ matrix.target }}/release/bundle/appimage/*.AppImage portable/Simple-VCS-Linux-x64.AppImage
           touch portable/PORTABLE
           zip -r -9 Simple-VCS-Linux-x64-portable.zip portable
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
