@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 use vcs_core::{Error, Result, Workspace};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +27,24 @@ impl Default for Settings {
 pub struct Store {
     pub path: PathBuf,
 }
+
+pub fn storage_dir(
+    app_config: PathBuf,
+    executable: &Path,
+    appimage: Option<&std::ffi::OsStr>,
+) -> PathBuf {
+    let portable_dir = appimage
+        .and_then(|path| Path::new(path).parent())
+        .filter(|path| path.join("PORTABLE").is_file())
+        .or_else(|| {
+            executable
+                .ancestors()
+                .take(5)
+                .find(|path| path.join("PORTABLE").is_file())
+        });
+    portable_dir.map(Path::to_path_buf).unwrap_or(app_config)
+}
+
 impl Store {
     pub fn load(&self) -> Result<Settings> {
         let Some(bytes) = crate::storage::read(&self.path)? else {
@@ -101,6 +122,35 @@ mod tests {
         let loaded = store.load().unwrap();
         assert_eq!(loaded.svn, "svn-custom");
         assert_eq!(loaded.workspaces[0].name, "開発");
+    }
+
+    #[test]
+    fn portable_marker_keeps_settings_and_operations_beside_the_app() {
+        let temp = tempfile::tempdir().unwrap();
+        let app = temp.path().join("release");
+        std::fs::create_dir_all(&app).unwrap();
+        let executable = app.join("SimpleVCS.exe");
+        let config = temp.path().join("user-config");
+        assert_eq!(storage_dir(config.clone(), &executable, None), config);
+        std::fs::write(app.join("PORTABLE"), "").unwrap();
+        assert_eq!(storage_dir(config, &executable, None), app);
+    }
+
+    #[test]
+    fn appimage_portable_marker_uses_the_appimage_folder() {
+        let temp = tempfile::tempdir().unwrap();
+        let folder = temp.path().join("portable");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("PORTABLE"), "").unwrap();
+        let appimage = folder.join("simple-vcs.AppImage");
+        assert_eq!(
+            storage_dir(
+                temp.path().join("config"),
+                Path::new("/usr/bin/simple-vcs"),
+                Some(appimage.as_os_str())
+            ),
+            folder
+        );
     }
 
     #[test]

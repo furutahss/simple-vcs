@@ -263,7 +263,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let config = app.path().app_config_dir()?;
+            let config = settings::storage_dir(app.path().app_config_dir()?, &std::env::current_exe()?, std::env::var_os("APPIMAGE").as_deref());
             std::fs::create_dir_all(&config)?;
             let instance_lock = std::fs::OpenOptions::new()
                 .create(true)

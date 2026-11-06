@@ -53,9 +53,10 @@ test("配布物の検査は中間.appを除外し、欠けたインストーラ�
   const names = ["app.exe", "app.msi", "app.deb", "app.AppImage", "app_aarch64.dmg", "app_x64.dmg"];
   for (const name of names) writeFileSync(join(root, name), "installer fixture");
   mkdirSync(join(root, "Simple VCS.app"));
+  for (const name of ["win-portable.zip", "mac-arm-portable.zip", "mac-intel-portable.zip", "linux-portable.zip"]) writeFileSync(join(root, name), "portable fixture");
   execFileSync("bash", ["-e", "-c", script], { cwd: root, stdio: "pipe" });
   const checksums = readFileSync(join(root, "SHA256SUMS"), "utf8").trim().split("\n");
-  assert.equal(checksums.length, 6);
+  assert.equal(checksums.length, 10);
   assert.ok(checksums.every(line => !line.includes(".app")));
   rmSync(join(root, "app_x64.dmg"));
   assert.throws(() => execFileSync("bash", ["-e", "-c", script], { cwd: root, stdio: "pipe" }));

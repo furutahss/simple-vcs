@@ -82,9 +82,11 @@ Tauri buildとcargo testは、同じtargetディレクトリで同時実行せ�
 
 | OS | CPU | 配布形式 |
 | --- | --- | --- |
-| Windows | x64 | NSIS `.exe`、`.msi` |
-| macOS | Apple Silicon / Intel | CPU別の `.dmg` |
-| Linux | x64 | `.deb`、`.AppImage` |
+| Windows | x64 | ポータブル `.zip`、NSIS `.exe`、`.msi` |
+| macOS | Apple Silicon / Intel | CPU別ポータブル `.zip`、`.dmg` |
+| Linux | x64 | ポータブル `.zip`、`.deb`、`.AppImage` |
+
+ポータブル版は展開後、`PORTABLE` ファイルとアプリを同じフォルダに置いて起動してください。作業コピー登録、CLI設定、未完了操作の記録はそのフォルダに保存され、フォルダごと移動できます。WindowsではWebView2、SVN、OpenSSHを別途用意してください。macOS/LinuxでもSVNとSSH先操作用のOpenSSHが必要です。設定や記録の保護のため、書込み可能なフォルダで使ってください。
 
 初回は **1.0.0 / `v1.0.0`**、以後はmainへのpushごとに既存タグの最大版からpatchを増やします（`1.0.1`、`1.0.2`…）。一度のpushに複数コミットがあっても1版です。連続pushは直列化し、すでに新しいソースに含まれる古いイベントはスキップします。タグは採番済みのソースを指し、タグ注釈の `Source-Commit` に元のmainコミットを記録します。
 
