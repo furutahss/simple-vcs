@@ -15,6 +15,13 @@ fn main() {
             "inspect_pending_operation",
             "acknowledge_pending_operation",
             "choose_directory",
+            "get_git_info",
+            "get_git_status",
+            "get_git_diff",
+            "get_git_history",
+            "get_git_commit_diff",
+            "get_git_branches",
+            "git_write",
         ]),
     ))
     .expect("Tauri build configuration failed");

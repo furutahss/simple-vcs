@@ -1,12 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "メイン画面の限定したSVN閲覧と登録操作",
+  "description": "メイン画面のSVN・Git閲覧と限定した登録操作",
   "windows": ["main"],
   "permissions": [
     "core:default", "allow-load-workspaces", "allow-save-workspace", "allow-remove-workspace",
     "allow-configure-tools", "allow-inspect-workspace", "allow-get-status", "allow-get-diff",
     "allow-get-history", "allow-choose-directory", "allow-preview-write", "allow-execute-write",
-    "allow-get-pending-operations", "allow-inspect-pending-operation", "allow-acknowledge-pending-operation"
+    "allow-get-pending-operations", "allow-inspect-pending-operation", "allow-acknowledge-pending-operation",
+    "allow-get-git-info", "allow-get-git-status", "allow-get-git-diff", "allow-get-git-history",
+    "allow-get-git-commit-diff", "allow-get-git-branches", "allow-git-write"
   ]
 }
