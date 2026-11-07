@@ -309,7 +309,7 @@ impl Client {
     }
 
     pub async fn branches(&self, workspace: &Workspace) -> Result<Vec<Branch>> {
-        let format = "%(refname:short)%00%(HEAD)%00%(upstream:short)%00%(ahead-behind:upstream)";
+        let format = "%(refname:short)%00%(HEAD)%00%(upstream:short)%00%(upstream:track,nobracket)";
         let output = self
             .run(
                 workspace,
@@ -322,17 +322,22 @@ impl Client {
             .lines()
             .filter_map(|line| {
                 let f = line.split('\0').collect::<Vec<_>>();
-                let (ahead, behind) = f
-                    .get(3)
-                    .unwrap_or(&"")
-                    .split_once(' ')
-                    .unwrap_or(("0", "0"));
+                let (mut ahead, mut behind) = (0, 0);
+                for tracking in f.get(3).unwrap_or(&"").split(", ") {
+                    if let Some((direction, count)) = tracking.split_once(' ') {
+                        match direction {
+                            "ahead" => ahead = count.parse().unwrap_or(0),
+                            "behind" => behind = count.parse().unwrap_or(0),
+                            _ => {}
+                        }
+                    }
+                }
                 Some(Branch {
                     name: (*f.first()?).into(),
                     current: f.get(1) == Some(&"*"),
                     upstream: (*f.get(2).unwrap_or(&"")).into(),
-                    ahead: ahead.parse().unwrap_or(0),
-                    behind: behind.parse().unwrap_or(0),
+                    ahead,
+                    behind,
                 })
             })
             .collect())
